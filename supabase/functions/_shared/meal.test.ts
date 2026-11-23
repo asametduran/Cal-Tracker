@@ -1,0 +1,80 @@
+import {
+  MAX_IMAGE_BASE64_CHARS,
+  buildGeminiBody,
+  parseGeminiReply,
+  tidyTitle,
+  validateRequestBody,
+} from './meal';
+
+const reply = (payload: unknown) => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(payload) }] } }] });
+const good = { isFood: true, title: 'Chicken burrito bowl', calories: 640, proteinG: 42, carbsG: 68, fatG: 22 };
+
+describe('buildGeminiBody', () => {
+  it('sends the image inline with a JSON schema and a conciseness instruction', () => {
+    const body = buildGeminiBody('AAAA', 'image/jpeg');
+    expect(body.contents[0].parts[1]).toEqual({ inline_data: { mime_type: 'image/jpeg', data: 'AAAA' } });
+    expect(body.generationConfig.responseMimeType).toBe('application/json');
+    expect(body.generationConfig.responseSchema.required).toContain('title');
+    expect((body.contents[0].parts[0] as { text: string }).text).toContain('at most 4 words');
+  });
+});
+
+describe('parseGeminiReply', () => {
+  it('returns the estimate for a valid reply', () => {
+    expect(parseGeminiReply(reply(good))).toEqual({
+      ok: true,
+      estimate: { title: 'Chicken burrito bowl', calories: 640, proteinG: 42, carbsG: 68, fatG: 22 },
+    });
+  });
+
+  it('flags non-food photos', () => {
+    expect(parseGeminiReply(reply({ ...good, isFood: false }))).toEqual({ ok: false, code: 'not_food' });
+  });
+
+  it('rejects malformed replies', () => {
+    const bad = { ok: false, code: 'bad_response' };
+    expect(parseGeminiReply(null)).toEqual(bad);
+    expect(parseGeminiReply({})).toEqual(bad);
+    expect(parseGeminiReply({ candidates: [] })).toEqual(bad);
+    expect(parseGeminiReply({ candidates: [{ content: { parts: [{ text: 'sorry' }] } }] })).toEqual(bad);
+    expect(parseGeminiReply(reply({ ...good, calories: -1 }))).toEqual(bad);
+    expect(parseGeminiReply(reply({ ...good, proteinG: 'lots' }))).toEqual(bad);
+    expect(parseGeminiReply(reply({ ...good, calories: 1e9 }))).toEqual(bad);
+    expect(parseGeminiReply(reply({ ...good, title: '   ' }))).toEqual(bad);
+    expect(parseGeminiReply(reply({ title: 'x' }))).toEqual(bad);
+  });
+
+  it('trims long titles so they fit two lines', () => {
+    const long = 'Slow roasted garlic herb crusted chicken breast with creamy mashed potatoes and gravy';
+    const result = parseGeminiReply(reply({ ...good, title: long }));
+    expect(result.ok && result.estimate.title.length).toBeLessThanOrEqual(40);
+    expect(result.ok && result.estimate.title.endsWith('…')).toBe(true);
+  });
+});
+
+describe('tidyTitle', () => {
+  it('collapses whitespace and leaves short titles alone', () => {
+    expect(tidyTitle('  Chicken   burrito\n bowl ')).toBe('Chicken burrito bowl');
+    expect(tidyTitle('Avocado toast')).toBe('Avocado toast');
+  });
+});
+
+describe('validateRequestBody', () => {
+  it('accepts a base64 image with an allowed type', () => {
+    expect(validateRequestBody({ image: 'AAAA', mimeType: 'image/jpeg' })).toEqual({
+      ok: true,
+      image: 'AAAA',
+      mimeType: 'image/jpeg',
+    });
+  });
+
+  it('rejects missing, oversized, non-base64 and wrongly typed input', () => {
+    expect(validateRequestBody(null).ok).toBe(false);
+    expect(validateRequestBody({}).ok).toBe(false);
+    expect(validateRequestBody({ image: '', mimeType: 'image/jpeg' }).ok).toBe(false);
+    expect(validateRequestBody({ image: 'A'.repeat(MAX_IMAGE_BASE64_CHARS + 1), mimeType: 'image/jpeg' }).ok).toBe(false);
+    expect(validateRequestBody({ image: 'data:image/jpeg;base64,AAAA', mimeType: 'image/jpeg' }).ok).toBe(false);
+    expect(validateRequestBody({ image: 'AAAA', mimeType: 'application/pdf' }).ok).toBe(false);
+    expect(validateRequestBody({ image: 'AAAA' }).ok).toBe(false);
+  });
+});

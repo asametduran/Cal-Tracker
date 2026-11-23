@@ -41,3 +41,12 @@ example
 # generated native folders
 /ios
 /android
+
+# Supabase CLI local state and any secrets files
+supabase/.temp/
+supabase/.branches/
+supabase/.env
+supabase/.env.*
+.env
+.env.*
+!.env.example

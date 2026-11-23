@@ -1,0 +1,7 @@
+# Supabase CLI project config for Cal Tracker.
+# `supabase link --project-ref <ref>` connects this folder to your hosted project.
+project_id = "cal-tracker"
+
+[functions.analyze-meal]
+# Reject requests without a valid JWT before the function even runs.
+verify_jwt = true

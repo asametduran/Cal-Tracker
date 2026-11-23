@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "app-scaffold",
-    "slug": "app-scaffold",
+    "name": "Cal Tracker",
+    "slug": "cal-tracker",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "appscaffold",
-    "userInterfaceStyle": "automatic",
+    "scheme": "caltracker",
+    "userInterfaceStyle": "dark",
     "ios": {
       "icon": "./assets/expo.icon"
     },
@@ -20,7 +20,7 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "output": "server",
+      "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
@@ -32,7 +32,15 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Cal Tracker to access your photos so you can log meals from them.",
+          "cameraPermission": "Allow Cal Tracker to use the camera so you can photograph your meals."
+        }
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,
