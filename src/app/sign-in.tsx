@@ -84,7 +84,7 @@ export default function SignInScreen() {
 
   return (
     <SafeAreaView style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.brand}>Cal Tracker</Text>
         <Text style={styles.title}>{copy.title}</Text>
         <Text style={styles.sub}>{copy.sub}</Text>
@@ -166,7 +166,8 @@ function Field({ label, value, onChangeText, secureTextEntry, keyboardType, auto
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg, alignItems: 'center' },
-  content: { padding: spacing.lg, paddingTop: spacing.xl, width: '100%', maxWidth: 440 },
+  scroll: { width: '100%' },
+  content: { padding: spacing.lg, paddingTop: spacing.xl, width: '100%', maxWidth: 440, alignSelf: 'center' },
   brand: { color: colors.accent, fontSize: 14, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: spacing.lg },
   title: { color: colors.text, fontSize: 30, fontWeight: '700', letterSpacing: -0.5 },
   sub: { color: colors.muted, fontSize: 15, marginTop: spacing.sm, marginBottom: spacing.lg },

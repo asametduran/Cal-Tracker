@@ -15,15 +15,12 @@ export type MealEstimate = {
 };
 
 export type AnalyzeErrorCode =
-  | 'missing_key'
   | 'missing_config'
   | 'unauthorized'
   | 'rate_limited'
   | 'not_food'
   | 'bad_response'
-  | 'network'
-  | 'unsupported_build'
-  | 'not_implemented';
+  | 'network';
 
 export class AnalyzeError extends Error {
   readonly code: AnalyzeErrorCode;
@@ -37,18 +34,8 @@ export class AnalyzeError extends Error {
 
 const nonNegative = z.number().finite().min(0);
 
-/** Shape the model must return. `isFood` lets the model reject non-food photos. */
-/** What the proxy (Edge Function) returns: the estimate without `isFood`. */
+/** What the proxy (Edge Function) returns, re-validated on the client before it is trusted. */
 export const estimateSchema = z.object({
-  title: z.string().trim().min(1),
-  calories: nonNegative,
-  proteinG: nonNegative,
-  carbsG: nonNegative,
-  fatG: nonNegative,
-});
-
-export const modelResponseSchema = z.object({
-  isFood: z.boolean(),
   title: z.string().trim().min(1),
   calories: nonNegative,
   proteinG: nonNegative,

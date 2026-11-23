@@ -100,6 +100,28 @@ export function parseGeminiReply(data: unknown): ParsedReply {
 
 export type RequestCheck = { ok: true; image: string; mimeType: string } | { ok: false; message: string };
 
+const HEIC_BRANDS = ['heic', 'heix', 'heim', 'heis', 'hevc', 'hevx', 'hevm', 'hevs', 'mif1', 'msf1'];
+
+/**
+ * Identifies an image from the first bytes of its base64 data ("magic bytes"), so a client cannot get a
+ * non-image past the allowlist by claiming a MIME type. JPEG starts "/9j/", PNG "iVBOR" and WebP "UklGR"
+ * in base64; HEIC/HEIF is recognised by the "ftyp" box at byte 4. Returns the MIME type, or null.
+ */
+export function detectImageType(base64: string): string | null {
+  const head = base64.replace(/[\r\n]/g, '').slice(0, 16);
+  let bytes: string;
+  try {
+    bytes = atob(head);
+  } catch {
+    return null;
+  }
+  if (bytes.startsWith('\xFF\xD8\xFF')) return 'image/jpeg';
+  if (bytes.startsWith('\x89PNG')) return 'image/png';
+  if (bytes.startsWith('RIFF') && bytes.slice(8, 12) === 'WEBP') return 'image/webp';
+  if (bytes.slice(4, 8) === 'ftyp' && HEIC_BRANDS.includes(bytes.slice(8, 12))) return 'image/heic';
+  return null;
+}
+
 /** Validates the JSON body sent to the Edge Function. */
 export function validateRequestBody(body: unknown): RequestCheck {
   if (typeof body !== 'object' || body === null) return { ok: false, message: 'Send a JSON object.' };
@@ -109,6 +131,12 @@ export function validateRequestBody(body: unknown): RequestCheck {
   if (!/^[A-Za-z0-9+/=\r\n]+$/.test(image)) return { ok: false, message: '"image" must be base64 without a data: prefix.' };
   if (typeof mimeType !== 'string' || !ALLOWED_MIME_TYPES.includes(mimeType)) {
     return { ok: false, message: 'Unsupported image type.' };
+  }
+  // The claimed type must match what the bytes actually are (HEIC and HEIF share a container).
+  const detected = detectImageType(image);
+  const claimed = mimeType === 'image/heif' ? 'image/heic' : mimeType;
+  if (detected === null || detected !== claimed) {
+    return { ok: false, message: 'That file is not a valid image of the stated type.' };
   }
   return { ok: true, image, mimeType };
 }

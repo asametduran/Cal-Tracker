@@ -1,15 +1,14 @@
 export type AuthLink = {
-  /** e.g. "recovery" (password reset) or "signup" (email confirmation). */
-  type: string | null;
-  accessToken: string | null;
-  refreshToken: string | null;
+  /** One-time PKCE authorization code from the email link, to be exchanged for a session. */
+  code: string | null;
   error: string | null;
 };
 
 /**
- * Reads the tokens Supabase appends to an email link, e.g.
- * `caltracker://reset#access_token=...&refresh_token=...&type=recovery`.
- * Returns null when the URL carries neither tokens nor an error.
+ * Reads the one-time code Supabase appends to an email link, e.g. `caltracker://reset?code=abc`.
+ * Session tokens in a URL (the old implicit flow, `#access_token=...`) are deliberately NOT read: anyone
+ * who can open a link in the app could otherwise sign the user into an account of their choosing.
+ * Returns null when the URL carries neither a code nor an error.
  */
 export function parseAuthLink(url: string): AuthLink | null {
   const hashIndex = url.indexOf('#');
@@ -25,10 +24,8 @@ export function parseAuthLink(url: string): AuthLink | null {
   }
 
   const link: AuthLink = {
-    type: params.get('type'),
-    accessToken: params.get('access_token'),
-    refreshToken: params.get('refresh_token'),
+    code: params.get('code'),
     error: params.get('error_description') ?? params.get('error'),
   };
-  return link.accessToken || link.refreshToken || link.error ? link : null;
+  return link.code || link.error ? link : null;
 }

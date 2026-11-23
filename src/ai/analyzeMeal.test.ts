@@ -10,10 +10,14 @@ describe('resolveBackend', () => {
     expect(resolveBackend('nonsense')).toBe('mock');
   });
 
-  it('accepts mock, gemini and proxy in development', () => {
+  it('accepts mock and proxy in development', () => {
     expect(resolveBackend('mock')).toBe('mock');
-    expect(resolveBackend('gemini')).toBe('gemini');
     expect(resolveBackend('proxy')).toBe('proxy');
+  });
+
+  it('no longer supports a direct client-side Gemini backend', () => {
+    expect(resolveBackend('gemini', true, false)).toBe('mock');
+    expect(resolveBackend('gemini', true, true)).toBe('proxy');
   });
 
   it('defaults to the proxy when Supabase is configured, else the offline mock', () => {
@@ -24,6 +28,7 @@ describe('resolveBackend', () => {
 
   it('always uses the proxy in release builds, whatever the env says', () => {
     expect(resolveBackend('gemini', false, true)).toBe('proxy');
+    expect(resolveBackend('mock', false, true)).toBe('proxy');
     expect(resolveBackend('mock', false, false)).toBe('proxy');
     expect(resolveBackend(undefined, false, false)).toBe('proxy');
   });
@@ -44,15 +49,5 @@ describe('analyzeMeal', () => {
 
   it('proxy backend reports missing_config when Supabase is not set up', async () => {
     await expect(analyzeMeal(photo, 'proxy')).rejects.toMatchObject({ code: 'missing_config' });
-  });
-
-  it('gemini backend without a key reports missing_key', async () => {
-    const saved = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
-    delete process.env.EXPO_PUBLIC_GEMINI_API_KEY;
-    try {
-      await expect(analyzeMeal(photo, 'gemini')).rejects.toMatchObject({ code: 'missing_key' });
-    } finally {
-      if (saved !== undefined) process.env.EXPO_PUBLIC_GEMINI_API_KEY = saved;
-    }
   });
 });

@@ -162,15 +162,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => data.subscription.unsubscribe();
   }, [handleSession]);
 
-  // Email links (confirm sign-up / reset password) opened inside the native app.
+  // Email links (confirm sign-up / reset password) opened inside the native app. They carry a one-time
+  // PKCE code, which Supabase only accepts from the device that requested the email. Tokens in a URL are
+  // ignored. (On web the Supabase client exchanges the code itself.) A password-reset code raises
+  // PASSWORD_RECOVERY through onAuthStateChange above.
   useEffect(() => {
     if (!supabase || Platform.OS === 'web') return;
     const client = supabase;
     const handleUrl = async (url: string | null) => {
       const link = url ? parseAuthLink(url) : null;
-      if (!link?.accessToken || !link.refreshToken) return;
-      if (link.type === 'recovery') setRecovery(true);
-      await client.auth.setSession({ access_token: link.accessToken, refresh_token: link.refreshToken });
+      if (!link?.code) return;
+      await client.auth.exchangeCodeForSession(link.code);
     };
     void Linking.getInitialURL().then(handleUrl);
     const subscription = Linking.addEventListener('url', (event) => void handleUrl(event.url));

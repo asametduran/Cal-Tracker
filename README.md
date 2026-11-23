@@ -23,11 +23,11 @@ Copy `.env.example` to `.env.local` (git-ignored). Everything prefixed `EXPO_PUB
 | --- | --- | --- |
 | `EXPO_PUBLIC_SUPABASE_URL` | app (public) | Project URL, `https://<ref>.supabase.co` |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | app (public) | Publishable/anon key. Safe to ship: Row Level Security protects the data |
-| `EXPO_PUBLIC_AI_BACKEND` | app (public) | `proxy` \| `mock` \| `gemini`. Unset = `proxy` if Supabase is configured, else `mock`. **Release builds always use `proxy`** |
-| `EXPO_PUBLIC_GEMINI_API_KEY` | dev only | Only for the direct `gemini` backend. Excluded from production bundles. Leave unset |
+| `EXPO_PUBLIC_AI_BACKEND` | app (public) | `proxy` \| `mock`. Unset = `proxy` if Supabase is configured, else `mock`. **Release builds always use `proxy`**. There is no client-side Gemini backend |
 | `GEMINI_API_KEY` | Supabase secret | Gemini key used by the Edge Function. Never reaches the app |
 | `GEMINI_MODEL` | Supabase secret | Optional, default `gemini-2.5-flash` |
 | `AI_DAILY_LIMIT` | Supabase secret | Optional scans per user per day, default `60` |
+| `AI_BURST_LIMIT` | Supabase secret | Optional scans per user per minute, default `6` |
 
 ## Database schema
 
@@ -39,18 +39,20 @@ Copy `.env.example` to `.env.local` (git-ignored). Everything prefixed `EXPO_PUB
 | `meals` | title, calories, macros, `day`, `logged_at`, and a small compressed JPEG thumbnail (data URI, at most 200 kB). Original photos are never stored |
 | `weight_logs` | one weigh-in per row (`kg`, `day`, `logged_at`) |
 | `meal_reminders` | reminder name, `hour`, `minute`, `enabled`, `sort_order` |
-| `ai_usage` | per-user daily scan counter. No client access; only the service role can call `consume_ai_quota()` |
+| `ai_usage` | per-user daily scan counter. No client access |
+| `ai_burst` | per-user per-minute scan counter. No client access |
 
-A `security definer` trigger creates a profile and three default (disabled) reminders when a user signs up.
+Only the service role can call `consume_ai_scan()` and `refund_ai_scan()` (migration `20261124000000_ai_burst_and_refund.sql`). A `security definer` trigger creates a profile and three default (disabled) reminders when a user signs up.
 
 ## Edge Function: `analyze-meal`
 
 `supabase/functions/analyze-meal/index.ts`. `POST { image: <base64>, mimeType }` returns `{ title, calories, proteinG, carbsG, fatG }`.
 
 1. Requires an `Authorization` header and verifies the JWT with `auth.getUser()` (`verify_jwt = true` as well). The anon key alone is rejected.
-2. Rejects bodies over 8.5 MB (413), then validates the image: base64, at most 8M characters, MIME type jpeg/png/webp/heic/heif.
-3. Enforces a per-user daily quota (429 `rate_limited`).
+2. Rejects bodies over 8.5 MB (413), then validates the image: base64, at most 8M characters, and the first bytes must really be a JPEG (`/9j/`), PNG (`iVBOR`), WebP (`UklGR`) or HEIC/HEIF that matches the stated MIME type.
+3. Enforces a per-user daily quota (default 60) and a per-minute burst limit (default 6): 429 `rate_limited`, with `Retry-After` for bursts. It fails closed if the check errors.
 4. Calls Gemini with the server-side key and a structured-output schema, then returns a concise title (at most about 4 words) and macros. Non-food images return 422 `not_food`.
+5. If the Gemini call fails or returns something unusable, the daily scan is refunded.
 
 Errors are `{ code, message }`. The prompt, schema and validation live in `supabase/functions/_shared/meal.ts`, shared with the dev client and unit tested.
 
@@ -85,7 +87,10 @@ In the Supabase dashboard under Authentication, set the Site URL and add the red
 
 ## Security notes
 
-- The Gemini key and service-role key exist only as Supabase secrets. A production web export contains neither the key nor the Gemini endpoint (verify with `npx expo export --platform web` and grep `dist/`).
+- **Auth uses PKCE.** Email links (confirm sign-up, reset password) carry a one-time `?code=` that Supabase only accepts from the device that requested the email, and the app exchanges it with `exchangeCodeForSession`. Session tokens in a URL are ignored, so a crafted link cannot sign someone into another account.
+- **Session tokens** are stored in the iOS Keychain / Android Keystore (`expo-secure-store`, chunked because values are size-limited). On web they use standard browser storage.
+- The Gemini key and service-role key exist only as Supabase secrets, and the app has no client-side Gemini code at all. A production web export contains neither a key nor the Gemini endpoint (verify with `npx expo export --platform web` and grep `dist/`).
+- In the Supabase dashboard set the minimum password length to 8 (the server default is 6), and consider CAPTCHA for sign-up.
 - `.env.local` and other env files are git-ignored. `.env.example` holds placeholders only.
 - Known limits: the on-device cache uses AsyncStorage (about 6 MB on Android), calendar percentages use today's goals for past days, and reminders only fire on phones.
 

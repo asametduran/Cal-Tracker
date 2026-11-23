@@ -4,9 +4,9 @@ Status key: [x] done, [ ] not started.
 
 ## 1. Core function
 Photo in, estimated title + calories + protein + carbs + fat out.
-- [x] `analyzeMeal(photo)` with `mock`, `gemini` (dev only) and `proxy` (stub) backends
+- [x] `analyzeMeal(photo)` with `mock` and `proxy` backends (the proxy is the Supabase Edge Function; there is no client-side Gemini)
 - [x] Capture screen (camera or library/screenshot) and Review screen with editable numbers
-- [ ] Verify against the real Gemini API (needs your key in `.env.local`; model ID `gemini-3.8-flash` is unverified)
+- [ ] Verify a real photo end to end through the deployed proxy (sign in, scan, check the estimate)
 
 ## 2. Core loop
 Log meals, hit daily calorie and macro goals, get rewarded each time.
@@ -34,6 +34,8 @@ Not started. Candidates: streaks, daily reminder. Added last, on purpose.
 - [x] Email/password auth: sign up, sign in, sign out, forgot + reset password
 - [x] Local-first sync: instant cached reads, queued offline writes, background refresh, local data imported once
 - [x] `analyze-meal` Edge Function + `proxy` backend; production bundle verified free of Gemini keys
-- [ ] Create the Supabase project, push the migration, set `GEMINI_API_KEY`, deploy the function (`supabase/README.md`)
+- [x] Supabase project linked, migrations pushed, `GEMINI_API_KEY` set, `analyze-meal` deployed (`supabase/README.md`)
+- [x] Security hardening: PKCE auth links, Keychain/Keystore session storage, image magic-byte check, per-minute burst limit, quota refund on provider failure
+- [ ] Dashboard: minimum password length 8 and redirect URLs; rotate the Gemini key
 - [ ] Test sign-up/reset emails end to end, on web and on a phone (needs the redirect URLs configured)
 - [ ] Move the on-device cache from AsyncStorage to SQLite if thumbnails outgrow ~6 MB on Android

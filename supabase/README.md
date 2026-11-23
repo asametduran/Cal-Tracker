@@ -39,7 +39,7 @@ your terminal (in Claude Code: prefix with `! `).
 4. **Store the Gemini key as a server-side secret** (use a key from https://aistudio.google.com/apikey):
    ```bash
    npx supabase secrets set GEMINI_API_KEY=<your-gemini-key>
-   # optional: npx supabase secrets set GEMINI_MODEL=gemini-2.5-flash AI_DAILY_LIMIT=60
+   # optional: npx supabase secrets set GEMINI_MODEL=gemini-2.5-flash AI_DAILY_LIMIT=60 AI_BURST_LIMIT=6
    ```
 
 5. **Deploy the function.**
@@ -52,15 +52,18 @@ your terminal (in Claude Code: prefix with `! `).
    - *URL Configuration > Redirect URLs*: add `http://localhost:8081`, `caltracker://**`, and, while developing in
      Expo Go, the `exp://…` pattern it prints. Password-reset and confirmation links only work for listed URLs.
    - *Providers > Email*: keep it enabled. *Confirm email* on is recommended; the app handles both settings.
-   - *Policies > Password*: set the minimum length to 8 to match the app.
+   - *Policies > Password*: set the minimum length to 8 to match the app. The server default is 6 and the
+     app's check can be bypassed by calling the auth API directly, so this setting is the real enforcement.
+   - The app uses the PKCE flow: reset and confirmation emails carry `?code=...`, which only works on the
+     device that requested the email.
 
 7. **Point the app at it.** In `.env.local`:
    ```
    EXPO_PUBLIC_SUPABASE_URL=https://<ref>.supabase.co
    EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon key>
    ```
-   Delete `EXPO_PUBLIC_GEMINI_API_KEY` and `EXPO_PUBLIC_AI_BACKEND=gemini` (or set `EXPO_PUBLIC_AI_BACKEND=proxy`),
-   then restart `npx expo start`. Rotate the old Gemini key if it ever sat in a client env file.
+   Set `EXPO_PUBLIC_AI_BACKEND=proxy` (or leave it unset), then restart `npx expo start`. The app has no
+   client-side Gemini backend. Rotate any Gemini key that ever sat in a client env file.
 
 ## Checking it works
 

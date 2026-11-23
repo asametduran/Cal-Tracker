@@ -40,7 +40,8 @@
           "cameraPermission": "Allow Cal Tracker to use the camera so you can photograph your meals."
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

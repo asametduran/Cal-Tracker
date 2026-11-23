@@ -1,6 +1,7 @@
 import {
   MAX_IMAGE_BASE64_CHARS,
   buildGeminiBody,
+  detectImageType,
   parseGeminiReply,
   tidyTitle,
   validateRequestBody,
@@ -59,13 +60,50 @@ describe('tidyTitle', () => {
   });
 });
 
+const b64 = (bytes: number[]) => Buffer.from(bytes).toString('base64');
+const ascii = (s: string) => [...s].map((c) => c.charCodeAt(0));
+const JPEG = b64([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, ...ascii('JFIF'), 0, 1, 1, 0]);
+const PNG = b64([0x89, ...ascii('PNG'), 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d]);
+const WEBP = b64([...ascii('RIFF'), 1, 2, 3, 4, ...ascii('WEBPVP8 ')]);
+const HEIC = b64([0, 0, 0, 0x18, ...ascii('ftypheic'), 0, 0, 0, 0]);
+const HEIF = b64([0, 0, 0, 0x18, ...ascii('ftypmif1'), 0, 0, 0, 0]);
+
+describe('detectImageType', () => {
+  it('recognises JPEG, PNG, WebP and HEIC/HEIF by their first bytes', () => {
+    expect(JPEG.startsWith('/9j/')).toBe(true);
+    expect(PNG.startsWith('iVBOR')).toBe(true);
+    expect(WEBP.startsWith('UklGR')).toBe(true);
+    expect(detectImageType(JPEG)).toBe('image/jpeg');
+    expect(detectImageType(PNG)).toBe('image/png');
+    expect(detectImageType(WEBP)).toBe('image/webp');
+    expect(detectImageType(HEIC)).toBe('image/heic');
+    expect(detectImageType(HEIF)).toBe('image/heic');
+  });
+
+  it('rejects other content: PDFs, scripts, RIFF that is not WebP, garbage and empty data', () => {
+    expect(detectImageType(Buffer.from('%PDF-1.7 fake pdf content').toString('base64'))).toBeNull();
+    expect(detectImageType(Buffer.from('<script>alert(1)</script>').toString('base64'))).toBeNull();
+    expect(detectImageType(b64([...ascii('RIFF'), 1, 2, 3, 4, ...ascii('WAVEfmt ')]))).toBeNull();
+    expect(detectImageType('!!!!')).toBeNull();
+    expect(detectImageType('')).toBeNull();
+  });
+});
+
 describe('validateRequestBody', () => {
-  it('accepts a base64 image with an allowed type', () => {
-    expect(validateRequestBody({ image: 'AAAA', mimeType: 'image/jpeg' })).toEqual({
-      ok: true,
-      image: 'AAAA',
-      mimeType: 'image/jpeg',
-    });
+  it('accepts a base64 image whose bytes match the stated type', () => {
+    expect(validateRequestBody({ image: JPEG, mimeType: 'image/jpeg' })).toEqual({ ok: true, image: JPEG, mimeType: 'image/jpeg' });
+    expect(validateRequestBody({ image: PNG, mimeType: 'image/png' }).ok).toBe(true);
+    expect(validateRequestBody({ image: WEBP, mimeType: 'image/webp' }).ok).toBe(true);
+    expect(validateRequestBody({ image: HEIC, mimeType: 'image/heic' }).ok).toBe(true);
+    expect(validateRequestBody({ image: HEIF, mimeType: 'image/heif' }).ok).toBe(true);
+  });
+
+  it('rejects a non-image or a mismatched type even when the claimed type is allowed', () => {
+    const pdf = Buffer.from('%PDF-1.7 fake pdf content').toString('base64');
+    expect(validateRequestBody({ image: pdf, mimeType: 'image/jpeg' }).ok).toBe(false);
+    expect(validateRequestBody({ image: 'AAAA', mimeType: 'image/jpeg' }).ok).toBe(false);
+    expect(validateRequestBody({ image: PNG, mimeType: 'image/jpeg' }).ok).toBe(false);
+    expect(validateRequestBody({ image: JPEG, mimeType: 'image/webp' }).ok).toBe(false);
   });
 
   it('rejects missing, oversized, non-base64 and wrongly typed input', () => {
