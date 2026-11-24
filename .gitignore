@@ -30,9 +30,6 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
-.env*.local
-
 # typescript
 *.tsbuildinfo
 
@@ -42,11 +39,29 @@ example
 /ios
 /android
 
-# Supabase CLI local state and any secrets files
+# Supabase CLI local state
 supabase/.temp/
 supabase/.branches/
-supabase/.env
-supabase/.env.*
-.env
-.env.*
+
+# env files can hold secrets (any folder, including supabase/.env and supabase/functions/.env);
+# only the template is committed
+.env*
 !.env.example
+
+# local databases (SQLite files and their journals)
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+
+# scratch / temporary output
+scratchpad/
+/tmp/
+/temp/
+*.tmp
+*.log
+
+# Claude Code per-user settings (the shared .claude/settings.json stays tracked)
+.claude/settings.local.json
